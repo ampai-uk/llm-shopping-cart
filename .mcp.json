@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "ocado": {
+      "command": "node",
+      "args": ["/home/kunal/code/cline/ocado/mcp-server.js"]
+    }
+  }
+}

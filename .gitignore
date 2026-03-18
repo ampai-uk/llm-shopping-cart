@@ -1,0 +1,8 @@
+node_modules
+design
+.env
+cookies.json
+cookies-play.json
+orders.json
+session.json
+NOTES.md

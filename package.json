@@ -1,0 +1,33 @@
+{
+  "name": "ocado",
+  "version": "1.0.0",
+  "description": "",
+  "main": "ocado.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "mcp": "node mcp-server.js",
+    "mcp:http": "node mcp-server-http.js",
+    "upload-session": "node scripts/upload-to-gcs.js session",
+    "upload-orders": "node scripts/upload-to-gcs.js orders"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@google-cloud/storage": "^7.15.0",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "dotenv": "^17.3.1",
+    "express": "^5.1.0",
+    "fuse.js": "^7.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "playwright": "^1.58.2",
+    "playwright-extra": "^4.3.6",
+    "puppeteer": "^24.37.5",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  }
+}
