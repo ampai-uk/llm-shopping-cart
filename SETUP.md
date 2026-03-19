@@ -17,6 +17,7 @@ If `git` is not found, detect the OS and offer to install it:
 - **macOS**: `xcode-select --install` or `brew install git`
 - **Ubuntu/Debian**: `sudo apt update && sudo apt install -y git`
 - **Fedora/RHEL**: `sudo dnf install -y git`
+- **Windows (Git Bash)**: Download from https://git-scm.com/download/win — Git Bash is included
 - **Windows (WSL)**: `sudo apt install -y git`
 
 **Always ask the user for permission before installing anything.**
@@ -33,13 +34,14 @@ npm --version
 ```
 
 If Node.js is missing or below v18, suggest installation:
-- **Recommended**: Install via [nvm](https://github.com/nvm-sh/nvm):
+- **macOS / Linux**: Install via [nvm](https://github.com/nvm-sh/nvm):
   ```bash
   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
   source ~/.bashrc   # or ~/.zshrc
   nvm install 20
   ```
-- **Alternative**: Download from https://nodejs.org/ (LTS version)
+- **Windows**: Download the LTS installer from https://nodejs.org/ — this adds `node` and `npm` to PATH for both PowerShell and Git Bash
+- **Alternative (all platforms)**: Download from https://nodejs.org/ (LTS version)
 
 **Always ask the user for permission before installing anything.**
 
@@ -56,13 +58,15 @@ cd llm-shopping-cart
 
 ---
 
-## Step 4 of 10: Run `/setup`
+## Step 4 of 10: Run `/setup` (local environment)
 
 Now that the repo is cloned and you are inside it, the `.claude/commands/setup.md` slash command is available.
 
 > **Note:** `/setup` is a **Claude Code slash command**, not a terminal command. Type `/setup` in the Claude Code chat prompt and press Enter. Claude will execute the setup wizard automatically.
 
-This handles: `npm install`, `.env` configuration, Ocado login, order history fetch, and verification.
+This handles: `npm install`, `.env` configuration, Ocado login, order history fetch, and smoke test verification.
+
+**You must complete `/setup` fully before continuing.** Steps 5–10 depend on the `session.json` and `data/orders.json` files it creates. Wait for `/setup` to report success, then proceed.
 
 ---
 
@@ -78,12 +82,31 @@ If `gcloud` is not found, detect the OS and offer to install it:
 - **macOS**: `brew install google-cloud-sdk`
 - **Ubuntu/Debian**: `sudo snap install google-cloud-cli --classic` or `sudo apt install google-cloud-cli`
 - **Other Linux**: Direct download from https://cloud.google.com/sdk/docs/install
+- **Windows**: Download the installer from https://cloud.google.com/sdk/docs/install — run `GoogleCloudSDKInstaller.exe`
 
 **Ask user permission before installing.**
 
-Verify after install:
+### Windows PATH fix
+
+On Windows (Git Bash / MSYS2), the installer adds `gcloud` to the Windows PATH but **not** to the bash PATH. If `gcloud` is not found after install, add it manually:
+
+```bash
+export PATH="/c/Users/$USERNAME/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin:$PATH"
+```
+
+Verify it works:
 ```bash
 gcloud --version | head -1
+```
+
+If the above still fails, try using the `.cmd` wrapper directly:
+```bash
+gcloud.cmd --version | head -1
+```
+
+If only `gcloud.cmd` works, create an alias for the rest of the session:
+```bash
+alias gcloud='gcloud.cmd'
 ```
 
 ---
@@ -97,16 +120,19 @@ gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null
 
 If no active account, run:
 ```bash
-gcloud auth login
+gcloud auth login 2>/dev/null || true
 ```
 
 Tell the user:
 > "A browser window will open for Google Cloud authentication. Sign in with your Google account and grant the requested permissions."
 
-Verify authentication:
+> **Note:** On Windows, `gcloud auth login` may print warnings to stderr and exit with code 1 even on success. **Ignore the exit code.** Always verify by checking the active account afterwards:
+
 ```bash
 gcloud auth list --filter=status:ACTIVE --format="value(account)"
 ```
+
+If an active account is shown, authentication succeeded — proceed to the next step.
 
 ---
 
@@ -175,7 +201,10 @@ test -f session.json && echo "session.json: OK" || echo "session.json: MISSING"
 test -f data/orders.json && echo "data/orders.json: OK" || echo "data/orders.json: MISSING"
 ```
 
-If either file is missing, tell the user to re-run `/setup` first.
+If either file is missing, tell the user:
+> "Local setup is incomplete. Please run `/setup` first (Step 4), then return here."
+
+> **Note:** `/setup` is a Claude Code slash command — type it in the chat prompt, not in a terminal.
 
 Run the deployment script with the selected project and region:
 ```bash
@@ -183,15 +212,20 @@ chmod +x scripts/gcp-setup.sh
 ./scripts/gcp-setup.sh <project-id> <region>
 ```
 
+> **Idempotency:** The script is safe to re-run. It checks for existing buckets, secrets, and service accounts before creating them. If the deploy fails partway through (e.g. billing not enabled, API quota exceeded), fix the issue and re-run the same command — it will skip already-completed steps and resume.
+
 This script (`scripts/gcp-setup.sh`) handles:
 1. Enabling required APIs (Cloud Run, Storage, Secret Manager, Cloud Build, Artifact Registry)
 2. Creating a GCS bucket for data files
-3. Creating OAuth credentials in Secret Manager (Client ID + Client Secret are printed — **tell the user to save them**)
+3. Creating OAuth credentials in Secret Manager
 4. Creating a service account with appropriate permissions
 5. Uploading `session.json` and `data/orders.json` to GCS
 6. Building and deploying to Cloud Run
+7. Saving OAuth credentials to `.oauth-credentials` in the project root (gitignored)
 
-After deployment completes, get the service URL:
+After deployment, the script prints two service URLs. **Use the stable URL** from `gcloud run services describe` (the shorter one), not the build-time URL from `gcloud run deploy` output.
+
+Get the service URL:
 ```bash
 SERVICE_URL=$(gcloud run services describe ocado-mcp --project=<project-id> --region=<region> --format="value(status.url)")
 echo "Service URL: $SERVICE_URL"
@@ -206,6 +240,11 @@ curl -s "$SERVICE_URL/" | head -5
 
 ## Step 10 of 10: Configure Claude Connector
 
+Read the saved OAuth credentials:
+```bash
+cat .oauth-credentials
+```
+
 Tell the user:
 ```
 Deployment complete!
@@ -219,8 +258,8 @@ To configure in Claude.ai:
   2. Add a new MCP connector
   3. URL: <service-url>/mcp
   4. Authentication: OAuth 2.0
-  5. Client ID: (from deployment output)
-  6. Client Secret: (from deployment output)
+  5. Client ID: (from .oauth-credentials)
+  6. Client Secret: (from .oauth-credentials)
   7. Token URL: <service-url>/token
 
 To update data after a new Ocado delivery:

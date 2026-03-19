@@ -89,6 +89,15 @@ fi
 echo "   └──────────────────────────────────────────────────────────────────────┘"
 echo ""
 
+# Save credentials to local file (gitignored)
+CREDS_FILE="${PROJECT_ROOT}/.oauth-credentials"
+cat > "$CREDS_FILE" <<CREDS
+OAUTH_CLIENT_ID=$OAUTH_CLIENT_ID
+OAUTH_CLIENT_SECRET=$OAUTH_CLIENT_SECRET
+CREDS
+echo "   Saved credentials to .oauth-credentials (gitignored)"
+echo ""
+
 # --- 4. Create service account ---
 echo "4. Creating service account..."
 if gcloud iam service-accounts describe "$SA_EMAIL" --project="$PROJECT" &>/dev/null; then
@@ -153,7 +162,8 @@ gcloud run deploy "$SERVICE" \
   --max-instances=3 \
   --timeout=60 \
   --set-env-vars="GCS_BUCKET=${BUCKET}" \
-  --set-secrets="OAUTH_CLIENT_ID=${SECRET_CLIENT_ID}:latest,OAUTH_CLIENT_SECRET=${SECRET_CLIENT_SECRET}:latest,OAUTH_JWT_SECRET=${SECRET_JWT}:latest"
+  --set-secrets="OAUTH_CLIENT_ID=${SECRET_CLIENT_ID}:latest,OAUTH_CLIENT_SECRET=${SECRET_CLIENT_SECRET}:latest,OAUTH_JWT_SECRET=${SECRET_JWT}:latest" \
+  --quiet
 
 # --- 8. Print service URL ---
 echo ""
