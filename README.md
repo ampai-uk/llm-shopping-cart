@@ -9,18 +9,12 @@ An MCP (Model Context Protocol) server that lets Claude interact with [Ocado](ht
    npm install
    ```
 
-2. Create a `.env` file with your Ocado credentials:
-   ```
-   OCADO_EMAIL=your@email.com
-   OCADO_PASSWORD=your-password
-   ```
-
-3. Log in to Ocado (opens a browser — you may need to handle CAPTCHA/2FA manually):
+2. Log in to Ocado (opens a browser — enter your credentials manually, handle CAPTCHA/2FA if prompted):
    ```bash
    node main.js --login --head
    ```
 
-4. Fetch your order history:
+3. Fetch your order history:
    ```bash
    node main.js --update-orders
    ```

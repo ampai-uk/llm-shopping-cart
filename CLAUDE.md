@@ -19,7 +19,6 @@ Use this to diagnose the current state and determine what action is needed:
 State            Check                        Fix
 ─────────────    ──────────────────────────    ────────────────────────────────
 FRESH            no node_modules/             npm install
-NO_ENV           no .env                      create .env with OCADO_EMAIL, OCADO_PASSWORD
 NO_SESSION       no session.json              node main.js --login --head
 NO_ORDERS        no data/orders.json          node main.js --update-orders
 READY            all files present            MCP server works
@@ -32,7 +31,7 @@ Run `/setup` to walk through all states interactively.
 - Sessions are stored in `session.json` (cookies + CSRF token)
 - Sessions expire after ~7 days
 - When expired, the user needs to re-login: `node main.js --login --head`
-- Login opens a real browser — the user may need to handle CAPTCHA or 2FA manually
+- Login opens a real browser — the user enters credentials manually and may need to handle CAPTCHA or 2FA
 
 ## Available MCP Tools
 
@@ -60,7 +59,6 @@ node mcp-server-http.js              # Start HTTP MCP server (for Cloud Run)
 
 These files contain sensitive data and are gitignored:
 
-- `.env` — Ocado credentials (OCADO_EMAIL, OCADO_PASSWORD)
 - `session.json` — Browser session cookies
 - `cookies.json` / `cookies-play.json` — Raw cookie exports
 - `data/orders.json` — Order history cache

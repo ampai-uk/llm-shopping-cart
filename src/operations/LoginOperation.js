@@ -1,14 +1,11 @@
-require('dotenv').config();
 const fs = require('fs');
 const Operation = require('../modules/Operation');
 
-const EMAIL = process.env.OCADO_EMAIL;
-const PASSWORD = process.env.OCADO_PASSWORD;
 const SESSION_FILE = './session.json';
 
 /**
- * Login operation - handles user authentication
- * Always performs a fresh login and saves session to session.json
+ * Login operation - opens browser for user to log in manually
+ * Waits for the user to complete login, then saves session to session.json
  */
 class LoginOperation extends Operation {
   constructor(options = {}) {
@@ -24,10 +21,6 @@ class LoginOperation extends Operation {
    * Execute the login operation
    */
   async execute() {
-    if (!EMAIL || !PASSWORD) {
-      throw new Error('Please set OCADO_EMAIL and OCADO_PASSWORD in .env file');
-    }
-
     const page = this.page;
 
     // 1. Navigate to ocado.com
@@ -59,51 +52,32 @@ class LoginOperation extends Operation {
     });
     console.log(`  Loaded: ${page.url()}`);
 
-    // Wait for SSO page to fully render after redirect
-    await this.sleep(5000);
+    // 4. Wait for user to log in manually
+    console.log('\n  Please log in manually in the browser window.');
+    console.log('  Enter your email and password, complete any CAPTCHA or 2FA, then wait.\n');
 
-    // 4. Fill in email (SSO page uses name="usernamelogin", type="email")
-    console.log('Filling in email...');
-    try {
-      await page.waitForSelector('input[name="usernamelogin"]', { timeout: 10000 });
-      await page.click('input[name="usernamelogin"]');
-      await page.type('input[name="usernamelogin"]', EMAIL, { delay: 50 });
-      console.log(`  Email entered: ${EMAIL}`);
-    } catch (e) {
-      console.log(`  Could not find email input: ${e.message}`);
+    // Poll until we leave the login/SSO pages (max 5 minutes)
+    const loginTimeout = 5 * 60 * 1000;
+    const startTime = Date.now();
+    let loggedIn = false;
+
+    while (Date.now() - startTime < loginTimeout) {
+      await this.sleep(2000);
+      const currentUrl = page.url();
+      if (
+        !currentUrl.includes('accounts.ocado.com') &&
+        !currentUrl.includes('sso.ocado.com') &&
+        !currentUrl.toLowerCase().includes('login')
+      ) {
+        loggedIn = true;
+        break;
+      }
     }
-
-    await this.sleep(500);
-
-    // 5. Fill in password (SSO page uses name="passwordlogin", type="password")
-    console.log('Filling in password...');
-    try {
-      await page.waitForSelector('input[name="passwordlogin"]', { timeout: 10000 });
-      await page.click('input[name="passwordlogin"]');
-      await page.type('input[name="passwordlogin"]', PASSWORD, { delay: 50 });
-      console.log('  Password entered');
-    } catch (e) {
-      console.log(`  Could not find password input: ${e.message}`);
-    }
-
-    await this.sleep(500);
-
-    // 6. Submit login by pressing Enter
-    console.log('Submitting login form...');
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {}),
-      page.keyboard.press('Enter'),
-    ]);
-
-    // 7. Wait for login to complete
-    console.log('\nWaiting for login to complete...');
-    await this.sleep(3000);
 
     const finalUrl = page.url();
     console.log(`  Current URL: ${finalUrl}`);
 
-    // Check if login was successful
-    if (!finalUrl.includes('accounts.ocado.com') && !finalUrl.includes('sso.ocado.com') && !finalUrl.toLowerCase().includes('login')) {
+    if (loggedIn) {
       console.log('  ✓ Login successful!');
 
       // Extract CSRF token from window.__INITIAL_STATE__
@@ -139,8 +113,8 @@ class LoginOperation extends Operation {
         csrfToken: csrfToken,
       };
     } else {
-      console.log('  ✗ Login may have failed, still on login page');
-      return { success: false, message: 'Login may have failed' };
+      console.log('  ✗ Login timed out — no login detected within 5 minutes');
+      return { success: false, message: 'Login timed out' };
     }
   }
 }

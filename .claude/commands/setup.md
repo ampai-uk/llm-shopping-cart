@@ -10,9 +10,6 @@ Run these checks and report which steps are needed:
 # Check node_modules
 test -d node_modules && echo "MODULES: OK" || echo "MODULES: MISSING"
 
-# Check .env
-test -f .env && echo "ENV: OK" || echo "ENV: MISSING"
-
 # Check session.json
 test -f session.json && echo "SESSION: OK" || echo "SESSION: MISSING"
 
@@ -41,35 +38,15 @@ If `node_modules/` is missing:
 npm install
 ```
 
-## Step 3: Configure credentials
-
-If `.env` is missing, offer the user two options:
-
-**Option A (more private):** Create the file manually
-> "Open your editor and create a `.env` file in the project root with:
-> ```
-> OCADO_EMAIL=your-email@example.com
-> OCADO_PASSWORD=your-password
-> ```
-> Let me know when you've saved it."
-
-**Option B (easier):** Paste credentials in chat
-> "You can paste your Ocado email and password here and I'll create the `.env` file for you. Note: these will be visible in your chat history."
-
-If `.env` already exists, confirm it has the required variables:
-```bash
-node -e "require('dotenv').config(); const e=process.env; console.log('EMAIL:', e.OCADO_EMAIL ? 'set' : 'MISSING'); console.log('PASSWORD:', e.OCADO_PASSWORD ? 'set' : 'MISSING')"
-```
-
-## Step 4: Login to Ocado
+## Step 3: Login to Ocado
 
 If `session.json` is missing OR older than 5 days:
 
 Tell the user:
-> "I'm going to open a browser window for you to log in to Ocado. You may need to:
-> 1. Complete a CAPTCHA
-> 2. Handle 2FA if enabled
-> 3. Wait for the page to fully load after login
+> "I'm going to open a browser window for you to log in to Ocado. You'll need to:
+> 1. Enter your email and password manually in the browser
+> 2. Complete a CAPTCHA if prompted
+> 3. Handle 2FA if enabled
 >
 > The browser will close automatically once the session is captured."
 
@@ -80,7 +57,7 @@ node main.js --login --head
 
 Wait for it to complete and verify `session.json` was created.
 
-## Step 5: Fetch order history
+## Step 4: Fetch order history
 
 If `data/orders.json` is missing:
 
@@ -93,7 +70,7 @@ Report how many orders were fetched.
 If orders already exist but are older than 7 days, suggest refreshing:
 > "Your order history is X days old. Would you like to refresh it?"
 
-## Step 6: Verify
+## Step 5: Verify
 
 Run a quick smoke test:
 
@@ -110,7 +87,7 @@ searchItems('milk', {}).then(r => {
 "
 ```
 
-## Step 7: Summary
+## Step 6: Summary
 
 Print a summary:
 ```
