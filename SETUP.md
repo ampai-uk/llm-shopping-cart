@@ -1,7 +1,7 @@
 # Ocado MCP Server — Bootstrap Instructions
 
 > **This file is written for Claude, not for humans.**
-> When a user pastes the raw GitHub URL of this file into Claude Code or Cowork, Claude should read these instructions and execute them step-by-step to set up the Ocado MCP server from scratch.
+> When a user pastes the raw GitHub URL of this file into Claude Code or Cowork, Claude should read these instructions and execute them step-by-step to set up the LLM-Shopping-Cart MCP server from scratch.
 
 ---
 
@@ -47,24 +47,20 @@ If Node.js is missing or below v18, suggest installation:
 
 ## Step 3: Clone the repository
 
-Clone the repo to a sensible default location. Ask the user where they'd like it, defaulting to `~/ocado-mcp`:
+Clone the repo to a sensible default location. Ask the user where they'd like it, defaulting to the current folder:
 
 ```bash
-git clone https://github.com/<owner>/ocado.git ~/ocado-mcp
-cd ~/ocado-mcp
+git clone https://github.com/ampai-uk/llm-shopping-cart.git .
+cd llm-shopping-cart
 ```
-
-Replace `<owner>` with the actual GitHub username/org from the URL the user originally pasted.
 
 ---
 
 ## Step 4: Run `/setup`
 
-Now that the repo is cloned and you are inside it, the `.claude/commands/setup.md` slash command is available. Run it:
+Now that the repo is cloned and you are inside it, the `.claude/commands/setup.md` slash command is available.
 
-```
-/setup
-```
+> **Note:** `/setup` is a **Claude Code slash command**, not a terminal command. Type `/setup` in the Claude Code chat prompt and press Enter. Claude will execute the setup wizard automatically.
 
 This handles: `npm install`, `.env` configuration, Ocado login, order history fetch, and verification.
 
@@ -94,4 +90,20 @@ Tell the user:
 - The Ocado MCP server is now configured and will be available in all future Claude Code sessions
 - They can use it to search their order history and add items to their Ocado cart
 - Run `/setup` any time to refresh their session or update order history
-- Run `/deploy` to deploy to Google Cloud Run for use with Claude.ai Connectors
+- If they want to deploy to Cloud Run, continue to Step 6
+
+---
+
+## Step 6: Deploy to Cloud Run (optional)
+
+If the user wants to deploy the MCP server to Google Cloud Run for use with Claude.ai Connectors, run the `/deploy` slash command:
+
+> **Note:** `/deploy` is a **Claude Code slash command**, not a terminal command. Type `/deploy` in the Claude Code chat prompt and press Enter.
+
+This handles: Docker build, Cloud Run deployment, OAuth setup, and Claude Connector configuration.
+
+---
+
+## Step 7: Done!
+
+All steps are complete. The user now has a working Ocado MCP server — either locally via Claude Code, or deployed to Cloud Run for Claude.ai Connectors (if they ran Step 6).

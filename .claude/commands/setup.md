@@ -18,8 +18,7 @@ test -f session.json && echo "SESSION: OK" || echo "SESSION: MISSING"
 
 # Check session age (if exists)
 if [ -f session.json ]; then
-  SESSION_AGE_DAYS=$(( ($(date +%s) - $(stat -c %Y session.json 2>/dev/null || stat -f %m session.json)) / 86400 ))
-  echo "SESSION_AGE: ${SESSION_AGE_DAYS} days"
+  node -e "const fs=require('fs'); const age=Math.floor((Date.now()-fs.statSync('session.json').mtimeMs)/86400000); console.log('SESSION_AGE:', age, 'days')"
 fi
 
 # Check orders
@@ -99,13 +98,15 @@ If orders already exist but are older than 7 days, suggest refreshing:
 Run a quick smoke test:
 
 ```bash
-timeout 3 node -e "
+node -e "
+setTimeout(() => process.exit(0), 3000);
 const { searchItems } = require('./src/ocado-service');
 searchItems('milk', {}).then(r => {
   console.log('Search test: OK');
   console.log('Matched:', r.items?.length || 0, 'items');
   if (r.items?.[0]) console.log('Example:', r.items[0].matchedName);
-}).catch(e => console.log('Search test: FAILED -', e.message));
+  process.exit(0);
+}).catch(e => { console.log('Search test: FAILED -', e.message); process.exit(1); });
 "
 ```
 
