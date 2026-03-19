@@ -5,7 +5,7 @@
 
 ---
 
-## Step 1 of 7: Check / install git
+## Step 1 of 10: Check / install git
 
 Check if `git` is available:
 
@@ -23,7 +23,7 @@ If `git` is not found, detect the OS and offer to install it:
 
 ---
 
-## Step 2 of 7: Check / install Node.js
+## Step 2 of 10: Check / install Node.js
 
 Check if `node` (v18+) and `npm` are available:
 
@@ -45,7 +45,7 @@ If Node.js is missing or below v18, suggest installation:
 
 ---
 
-## Step 3 of 7: Clone the repository
+## Step 3 of 10: Clone the repository
 
 Clone the repo to a sensible default location. Ask the user where they'd like it, defaulting to the current folder:
 
@@ -56,7 +56,7 @@ cd llm-shopping-cart
 
 ---
 
-## Step 4 of 7: Run `/setup`
+## Step 4 of 10: Run `/setup`
 
 Now that the repo is cloned and you are inside it, the `.claude/commands/setup.md` slash command is available.
 
@@ -66,44 +66,166 @@ This handles: `npm install`, `.env` configuration, Ocado login, order history fe
 
 ---
 
-## Step 5 of 7: Configure MCP for Claude
+## Step 5 of 10: Check / install gcloud CLI
 
-Add the Ocado MCP server to the user's Claude configuration so it's available globally.
+Check if `gcloud` is available:
 
-For **Claude Code**, add to `~/.claude/.mcp.json` (create if it doesn't exist):
-
-```json
-{
-  "mcpServers": {
-    "ocado": {
-      "command": "node",
-      "args": ["<full-path-to-cloned-repo>/mcp-server.js"],
-      "cwd": "<full-path-to-cloned-repo>"
-    }
-  }
-}
+```bash
+gcloud --version 2>/dev/null | head -1
 ```
 
-Replace `<full-path-to-cloned-repo>` with the absolute path where the repo was cloned (e.g. `/home/username/ocado-mcp`).
+If `gcloud` is not found, detect the OS and offer to install it:
+- **macOS**: `brew install google-cloud-sdk`
+- **Ubuntu/Debian**: `sudo snap install google-cloud-cli --classic` or `sudo apt install google-cloud-cli`
+- **Other Linux**: Direct download from https://cloud.google.com/sdk/docs/install
+
+**Ask user permission before installing.**
+
+Verify after install:
+```bash
+gcloud --version | head -1
+```
+
+---
+
+## Step 6 of 10: Authenticate with Google Cloud
+
+Check if already logged in:
+```bash
+gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null
+```
+
+If no active account, run:
+```bash
+gcloud auth login
+```
 
 Tell the user:
-- The Ocado MCP server is now configured and will be available in all future Claude Code sessions
-- They can use it to search their order history and add items to their Ocado cart
-- Run `/setup` any time to refresh their session or update order history
-- If they want to deploy to Cloud Run, continue to Step 6
+> "A browser window will open for Google Cloud authentication. Sign in with your Google account and grant the requested permissions."
+
+Verify authentication:
+```bash
+gcloud auth list --filter=status:ACTIVE --format="value(account)"
+```
 
 ---
 
-## Step 6 of 7: Deploy to Cloud Run (optional)
+## Step 7 of 10: GCP project and billing
 
-If the user wants to deploy the MCP server to Google Cloud Run for use with Claude.ai Connectors, run the `/deploy` slash command:
+Ask the user:
+> "Do you have an existing GCP project to use, or should I create a new one?"
 
-> **Note:** `/deploy` is a **Claude Code slash command**, not a terminal command. Type `/deploy` in the Claude Code chat prompt and press Enter.
+**If existing project:**
+```bash
+gcloud projects describe <project-id>
+```
 
-This handles: Docker build, Cloud Run deployment, OAuth setup, and Claude Connector configuration.
+**If new project:**
+Generate a project ID like `ocado-mcp-<random-4-chars>`:
+```bash
+PROJECT_ID="ocado-mcp-$(openssl rand -hex 2)"
+gcloud projects create "$PROJECT_ID" --name="Ocado MCP"
+```
+
+Set as active project:
+```bash
+gcloud config set project <project-id>
+```
+
+### Check billing
+
+```bash
+gcloud billing projects describe $(gcloud config get-value project) --format="value(billingAccountName)" 2>/dev/null
+```
+
+If no billing account is linked, tell the user:
+> "Your project needs a billing account to use Cloud Run. Google Cloud has a generous free tier — Cloud Run offers 2 million free requests per month.
+>
+> Please link a billing account at:
+> https://console.cloud.google.com/billing/linkedaccount?project=<project-id>
+>
+> Let me know when you've done this."
+
+Re-verify billing before proceeding:
+```bash
+gcloud billing projects describe $(gcloud config get-value project) --format="value(billingAccountName)"
+```
 
 ---
 
-## Step 7 of 7: Done!
+## Step 8 of 10: Select region
 
-All steps are complete. The user now has a working Ocado MCP server — either locally via Claude Code, or deployed to Cloud Run for Claude.ai Connectors (if they ran Step 6).
+Default to `europe-west2` (London). Ask the user:
+> "I'll deploy to **europe-west2** (London) by default. Would you like a different region?
+>
+> Common options:
+> - `europe-west2` — London
+> - `europe-west1` — Belgium
+> - `us-central1` — Iowa
+> - `us-east1` — South Carolina
+> - `asia-east1` — Taiwan"
+
+---
+
+## Step 9 of 10: Deploy to Cloud Run
+
+First verify that local setup is complete (session and orders exist from Step 4):
+```bash
+test -f session.json && echo "session.json: OK" || echo "session.json: MISSING"
+test -f data/orders.json && echo "data/orders.json: OK" || echo "data/orders.json: MISSING"
+```
+
+If either file is missing, tell the user to re-run `/setup` first.
+
+Run the deployment script with the selected project and region:
+```bash
+chmod +x scripts/gcp-setup.sh
+./scripts/gcp-setup.sh <project-id> <region>
+```
+
+This script (`scripts/gcp-setup.sh`) handles:
+1. Enabling required APIs (Cloud Run, Storage, Secret Manager, Cloud Build, Artifact Registry)
+2. Creating a GCS bucket for data files
+3. Creating OAuth credentials in Secret Manager (Client ID + Client Secret are printed — **tell the user to save them**)
+4. Creating a service account with appropriate permissions
+5. Uploading `session.json` and `data/orders.json` to GCS
+6. Building and deploying to Cloud Run
+
+After deployment completes, get the service URL:
+```bash
+SERVICE_URL=$(gcloud run services describe ocado-mcp --project=<project-id> --region=<region> --format="value(status.url)")
+echo "Service URL: $SERVICE_URL"
+```
+
+Test the health endpoint:
+```bash
+curl -s "$SERVICE_URL/" | head -5
+```
+
+---
+
+## Step 10 of 10: Configure Claude Connector
+
+Tell the user:
+```
+Deployment complete!
+
+  Service URL:    <service-url>
+  MCP Endpoint:   <service-url>/mcp
+  Token Endpoint: <service-url>/token
+
+To configure in Claude.ai:
+  1. Go to Claude.ai Settings > Connectors
+  2. Add a new MCP connector
+  3. URL: <service-url>/mcp
+  4. Authentication: OAuth 2.0
+  5. Client ID: (from deployment output)
+  6. Client Secret: (from deployment output)
+  7. Token URL: <service-url>/token
+
+To update data after a new Ocado delivery:
+  1. Run /setup locally to refresh session and orders
+  2. Re-run /deploy to upload fresh data to Cloud Run
+```
+
+> **Note:** `/setup` and `/deploy` are **Claude Code slash commands** — type them in the Claude Code chat prompt, not in a terminal.
