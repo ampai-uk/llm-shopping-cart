@@ -2,6 +2,67 @@
 
 You are running the `/setup` command for the Ocado MCP server. This is an idempotent wizard — check the current state and skip steps that are already complete.
 
+## Before you begin
+
+Before starting setup, ask the user the following questions. **Do not proceed until all three are acknowledged.**
+
+### 1. License acknowledgement
+
+> "This project is shared under the **MIT License**. Please review the license here:
+> https://github.com/ampai-uk/llm-shopping-cart/blob/main/LICENSE
+>
+> Do you acknowledge that you have read and accept the terms of the MIT License?"
+
+Wait for the user to confirm before continuing.
+
+### 2. Usage disclaimer
+
+> "This tool connects to third-party shopping websites using custom external connectors. Please note:
+> - It is **your responsibility** to review whether the terms of service or policies of the shopping websites you connect to permit the use of custom external connectors.
+> - You use this tool **at your own risk**. The authors of this code are **not liable** for how you use it or for any consequences arising from its use.
+>
+> Do you acknowledge and accept these terms?"
+
+Wait for the user to confirm before continuing.
+
+### 3. Authentication mode
+
+> "How would you like to authenticate your deployed MCP server?
+>
+> **Option A: No authentication (simpler setup)**
+> The server will be accessible via a private URL with no login required. Anyone with the URL can search your order history and add items to your cart. This is simpler to set up and suitable if you keep the URL private.
+>
+> **Option B: OAuth authentication (more secure)**
+> The server will require OAuth 2.0 authentication. This adds extra setup steps (creating OAuth secrets) but ensures only authorized users can access your server.
+>
+> Which do you prefer — A (no auth) or B (OAuth)?"
+
+Store their choice — it will affect the deployment step later.
+
+### 4. Overview
+
+After the user has answered all three questions, give them an overview:
+
+> "Great — here's what we'll do:
+>
+> The setup has **7 steps**:
+> 1. Check current state
+> 2. Install dependencies
+> 3. Login to Ocado
+> 4. Fetch order history
+> 5. Verify local setup
+> 6. Deploy to Google Cloud Run
+> 7. Summary
+>
+> A few things to be aware of:
+> - Several steps will run scripts that require **your approval** before executing.
+> - At **Step 3**, a browser will open and you'll need to **enter your Ocado credentials manually**.
+> - At **Step 6**, you'll need to **manually link a billing account** to your GCP project if one isn't already linked.
+>
+> Ready to begin?"
+
+Wait for the user to confirm before proceeding.
+
 ## Step 1: Check current state
 
 Run these checks and report which steps are needed:
@@ -87,7 +148,11 @@ searchItems('milk', {}).then(r => {
 "
 ```
 
-## Step 6: Summary
+## Step 6: Deploy to Google Cloud Run
+
+Now run the `/deploy` command to deploy the MCP server. Pass along the user's authentication choice from the "Before you begin" section.
+
+## Step 7: Summary
 
 Print a summary:
 ```
@@ -104,6 +169,5 @@ Available tools:
 
 Tips:
   - Re-run /setup any time to refresh your session or orders
-  - Run /deploy to deploy to Google Cloud Run
   - Sessions expire after ~7 days — /setup will detect this
 ```
