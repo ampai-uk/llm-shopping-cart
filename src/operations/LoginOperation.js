@@ -80,24 +80,51 @@ class LoginOperation extends Operation {
     if (loggedIn) {
       console.log('  ✓ Login successful!');
 
-      // Extract CSRF token from window.__INITIAL_STATE__
+      // Wait for page to fully load after login redirect
+      console.log('\nWaiting for page to fully load...');
+      try {
+        await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 10000 }).catch(() => {});
+      } catch (e) {
+        // Navigation may have already completed
+      }
+      // Ensure we're on the main site where __INITIAL_STATE__ is available
+      const postLoginUrl = page.url();
+      if (!postLoginUrl.includes('ocado.com') || postLoginUrl.includes('sso.')) {
+        console.log('  Navigating to ocado.com to get CSRF token...');
+        await page.goto('https://www.ocado.com/', { waitUntil: 'networkidle0', timeout: 30000 });
+      }
+
+      // Extract CSRF token from window.__INITIAL_STATE__ with retries
       console.log('\nExtracting CSRF token...');
       let csrfToken = null;
-      try {
-        csrfToken = await page.evaluate(() => {
-          if (window.__INITIAL_STATE__?.session?.csrf?.token) {
-            return window.__INITIAL_STATE__.session.csrf.token;
-          }
-          return null;
-        });
+      const maxRetries = 5;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          csrfToken = await page.evaluate(() => {
+            if (window.__INITIAL_STATE__?.session?.csrf?.token) {
+              return window.__INITIAL_STATE__.session.csrf.token;
+            }
+            return null;
+          });
 
-        if (csrfToken) {
-          console.log(`  CSRF token found: ${csrfToken.substring(0, 10)}...`);
-        } else {
-          console.log('  CSRF token not found in __INITIAL_STATE__');
+          if (csrfToken) {
+            console.log(`  CSRF token found: ${csrfToken.substring(0, 10)}...`);
+            break;
+          } else if (attempt < maxRetries) {
+            console.log(`  CSRF token not found yet (attempt ${attempt}/${maxRetries}), waiting...`);
+            await this.sleep(2000);
+            // Reload the page on later attempts to trigger __INITIAL_STATE__ population
+            if (attempt === 3) {
+              console.log('  Reloading page to retry...');
+              await page.reload({ waitUntil: 'networkidle0', timeout: 15000 });
+            }
+          } else {
+            console.log('  CSRF token not found in __INITIAL_STATE__ after all retries');
+          }
+        } catch (e) {
+          console.log(`  Error extracting CSRF token (attempt ${attempt}): ${e.message}`);
+          if (attempt < maxRetries) await this.sleep(2000);
         }
-      } catch (e) {
-        console.log(`  Error extracting CSRF token: ${e.message}`);
       }
 
       // Always save session
