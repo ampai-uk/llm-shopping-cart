@@ -1,6 +1,10 @@
 # Deploy Ocado MCP to Google Cloud Run
 
-You are running the `/deploy` command to deploy the Ocado MCP server to Google Cloud Run. This makes the MCP server accessible via HTTP with OAuth authentication, suitable for use with Claude.ai Connectors.
+You are running the `/deploy` command to deploy the Ocado MCP server to Google Cloud Run. This makes the MCP server accessible via HTTP, suitable for use with Claude.ai Connectors.
+
+If the user chose an authentication mode during `/setup`, use that choice. Otherwise, ask them:
+- **No auth (`--no-oauth`):** Public URL, no OAuth secrets created. Simpler setup.
+- **OAuth (default):** Requires OAuth 2.0 credentials. More secure.
 
 Walk through each step, checking what's already done and skipping completed steps.
 
@@ -111,17 +115,31 @@ Stop here if files are missing.
 
 ## Step 7: Deploy
 
-Run the deployment script with the selected project and region:
+Run the deployment script with the selected project and region.
 
+**If the user chose no auth (Option A):**
 ```bash
 chmod +x scripts/gcp-setup.sh
-./scripts/gcp-setup.sh <project-id> <region>
+bash scripts/gcp-setup.sh --no-oauth <project-id> <region>
+```
+
+**If the user chose OAuth (Option B / default):**
+```bash
+chmod +x scripts/gcp-setup.sh
+bash scripts/gcp-setup.sh <project-id> <region>
+```
+
+**Windows (Git Bash / MSYS2):** If `gcloud` was installed via the Google Cloud SDK installer and wasn't found earlier, ensure PATH persists for this command:
+```bash
+export PATH="/c/Users/$USERNAME/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin:$PATH"
+export PROJECT_ROOT="$(pwd)"
+bash scripts/gcp-setup.sh [--no-oauth] <project-id> <region>
 ```
 
 This script handles:
 1. Enabling required APIs (Cloud Run, Storage, Secret Manager, Cloud Build, Artifact Registry)
 2. Creating a GCS bucket for data files
-3. Creating OAuth secrets in Secret Manager
+3. Creating OAuth secrets in Secret Manager (skipped with `--no-oauth`)
 4. Creating a service account with appropriate permissions
 5. Uploading `session.json` and `data/orders.json` to GCS
 6. Deploying to Cloud Run
@@ -139,7 +157,9 @@ Test the health endpoint:
 curl -s "$SERVICE_URL/" | head -5
 ```
 
-Print the results:
+Print the results. Adapt the output depending on whether OAuth was used:
+
+**If OAuth:**
 ```
 Deployment complete!
 
@@ -158,7 +178,25 @@ To configure in Claude.ai Connectors:
   5. Client ID: (from deployment output)
   6. Client Secret: (from deployment output)
   7. Token URL: <service-url>/token
+```
 
+**If no auth:**
+```
+Deployment complete!
+
+  Service URL:   <service-url>
+  MCP Endpoint:  <service-url>/mcp
+  Auth:          None (public URL — keep it private)
+
+To configure in Claude.ai Connectors:
+  1. Go to Claude.ai Settings > Connectors
+  2. Add a new MCP connector
+  3. URL: <service-url>/mcp
+  4. Authentication: None
+```
+
+**For both modes:**
+```
 To update data after a new Ocado delivery:
   1. Run /setup locally to refresh session and orders
   2. Re-run /deploy to upload fresh data to Cloud Run

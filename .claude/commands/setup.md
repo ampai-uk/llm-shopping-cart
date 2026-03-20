@@ -30,10 +30,10 @@ Wait for the user to confirm before continuing.
 > "How would you like to authenticate your deployed MCP server?
 >
 > **Option A: No authentication (simpler setup)**
-> The server will be accessible via a private URL with no login required. Anyone with the URL can search your order history and add items to your cart. This is simpler to set up and suitable if you keep the URL private.
+> The Cloud Run service URL will be publicly accessible with no OAuth layer. Anyone with the URL can search your order history and add items to your cart — but they **cannot** check out, view payment details, or access your account. The URL is unique and not discoverable. This skips OAuth secret creation entirely, making installation easier.
 >
 > **Option B: OAuth authentication (more secure)**
-> The server will require OAuth 2.0 authentication. This adds extra setup steps (creating OAuth secrets) but ensures only authorized users can access your server.
+> The server will require OAuth 2.0 credentials (client ID + secret) to access. This adds extra setup steps (creating secrets in Secret Manager) but ensures only authorized clients can call the API.
 >
 > Which do you prefer — A (no auth) or B (OAuth)?"
 
@@ -56,8 +56,9 @@ After the user has answered all three questions, give them an overview:
 >
 > A few things to be aware of:
 > - Several steps will run scripts that require **your approval** before executing.
+> - At **Step 2**, `npm install` may show security audit warnings — these are in transitive/dev dependencies and are safe to ignore.
 > - At **Step 3**, a browser will open and you'll need to **enter your Ocado credentials manually**.
-> - At **Step 6**, you'll need to **manually link a billing account** to your GCP project if one isn't already linked.
+> - At **Step 6** (deploy), you'll need to **manually link a billing account** to your GCP project if one isn't already linked.
 >
 > Ready to begin?"
 
@@ -79,6 +80,19 @@ if [ -f session.json ]; then
   node -e "const fs=require('fs'); const age=Math.floor((Date.now()-fs.statSync('session.json').mtimeMs)/86400000); console.log('SESSION_AGE:', age, 'days')"
 fi
 
+# Check session has cookies and valid CSRF token
+if [ -f session.json ]; then
+  node -e "
+    const s=JSON.parse(require('fs').readFileSync('session.json','utf8'));
+    const hasCookies = s.cookies && s.cookies.length > 0;
+    const hasCsrf = s.csrfToken && s.csrfToken !== 'undefined' && s.csrfToken !== 'null';
+    console.log('SESSION_COOKIES:', hasCookies ? s.cookies.length : 0);
+    console.log('SESSION_CSRF:', hasCsrf ? 'OK' : 'MISSING');
+    if (!hasCookies || !hasCsrf) console.log('SESSION_QUALITY: BAD — re-login required');
+    else console.log('SESSION_QUALITY: OK');
+  "
+fi
+
 # Check orders
 test -f data/orders.json && echo "ORDERS: OK" || echo "ORDERS: MISSING"
 
@@ -91,6 +105,11 @@ fi
 
 Tell the user which steps will be performed and which are already done.
 
+**If SESSION_CSRF is MISSING or SESSION_QUALITY is BAD**, tell the user:
+> "Your session file exists but is missing cookies or a valid CSRF token — this means the login didn't capture properly. We'll need to log in again."
+
+Mark Step 3 as required.
+
 ## Step 2: Install dependencies
 
 If `node_modules/` is missing:
@@ -99,9 +118,12 @@ If `node_modules/` is missing:
 npm install
 ```
 
+After `npm install` completes, if there are audit warnings, tell the user:
+> "The npm audit warnings above are in transitive/dev dependencies and don't affect runtime — safe to ignore."
+
 ## Step 3: Login to Ocado
 
-If `session.json` is missing OR older than 5 days:
+If `session.json` is missing, older than 5 days, or has bad session quality (missing CSRF token):
 
 Tell the user:
 > "I'm going to open a browser window for you to log in to Ocado. You'll need to:
@@ -116,7 +138,28 @@ Then run:
 node main.js --login --head
 ```
 
-Wait for it to complete and verify `session.json` was created.
+Wait for it to complete, then **validate the captured session**:
+
+```bash
+node -e "
+  const s=JSON.parse(require('fs').readFileSync('session.json','utf8'));
+  const hasCookies = s.cookies && s.cookies.length > 0;
+  const hasCsrf = s.csrfToken && s.csrfToken !== 'undefined' && s.csrfToken !== 'null';
+  console.log('Cookies:', hasCookies ? s.cookies.length + ' captured' : 'NONE');
+  console.log('CSRF token:', hasCsrf ? s.csrfToken.substring(0,10) + '...' : 'MISSING');
+  if (!hasCookies || !hasCsrf) {
+    console.log('');
+    console.log('⚠ Session capture incomplete — login needs to be repeated.');
+    process.exit(1);
+  }
+  console.log('✓ Session captured successfully.');
+"
+```
+
+**If the validation fails** (exit code 1 or CSRF is `undefined`), tell the user:
+> "The session wasn't captured properly (CSRF token is missing). Let's try logging in again."
+
+Then repeat the login step. Do not proceed to Step 4 until the session is validated.
 
 ## Step 4: Fetch order history
 
@@ -126,7 +169,14 @@ If `data/orders.json` is missing:
 node main.js --update-orders
 ```
 
-Report how many orders were fetched.
+After fetching, **check that orders were actually returned** (an expired session silently returns 0 orders):
+
+```bash
+node -e "const o=require('./data/orders.json'); console.log('Orders:', o.length, o.length===0 ? '⚠ WARNING: 0 orders — session may not be authenticated' : '✓')"
+```
+
+If 0 orders were returned, warn the user:
+> "0 orders were fetched — this usually means the session cookies are expired or invalid. You may need to re-login (Step 3) and then re-fetch orders."
 
 If orders already exist but are older than 7 days, suggest refreshing:
 > "Your order history is X days old. Would you like to refresh it?"
@@ -150,7 +200,18 @@ searchItems('milk', {}).then(r => {
 
 ## Step 6: Deploy to Google Cloud Run
 
-Now run the `/deploy` command to deploy the MCP server. Pass along the user's authentication choice from the "Before you begin" section.
+Now run the `/deploy` command to deploy the MCP server. Pass along the user's authentication choice from the "Before you begin" section:
+
+- **Option A (no auth):** Pass `--no-oauth` to the deploy script
+- **Option B (OAuth):** Deploy with OAuth (the default)
+
+**Windows (Git Bash / MSYS2) note:** If `gcloud` was not found during deploy but is installed via the Google Cloud SDK installer, the PATH fix needs to persist across all steps. Run the deploy command like this:
+
+```bash
+export PATH="/c/Users/$USERNAME/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin:$PATH"
+export PROJECT_ROOT="$(pwd)"
+bash scripts/gcp-setup.sh <project-id> <region>
+```
 
 ## Step 7: Summary
 
