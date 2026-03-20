@@ -195,6 +195,40 @@ To configure in Claude.ai Connectors:
   4. Authentication: None
 ```
 
+## Step 9: Register MCP connector in Claude Code
+
+Ask the user:
+> "Would you like me to register the deployed MCP server in your Claude Code settings so it's available as a connector?"
+
+If they confirm:
+
+**If no auth:**
+```bash
+claude mcp add --transport http ocado-remote <service-url>/mcp
+```
+
+**If OAuth:**
+```bash
+claude mcp add --transport http ocado-remote <service-url>/mcp \
+  --header "Authorization: Bearer <token>"
+```
+
+To get a token for the header, first fetch one:
+```bash
+TOKEN=$(curl -s -X POST <service-url>/token \
+  -d "grant_type=client_credentials&client_id=<client-id>&client_secret=<client-secret>" \
+  | node -e "process.stdin.on('data',d=>console.log(JSON.parse(d).access_token))")
+claude mcp add --transport http ocado-remote <service-url>/mcp \
+  --header "Authorization: Bearer $TOKEN"
+```
+
+Note: OAuth tokens expire. For a more permanent setup, the user can configure the connector in Claude.ai Settings > Connectors with the full OAuth flow (client ID, client secret, token URL).
+
+After adding, verify:
+```bash
+claude mcp list
+```
+
 **For both modes:**
 ```
 To update data after a new Ocado delivery:
