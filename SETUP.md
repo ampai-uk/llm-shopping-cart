@@ -118,7 +118,7 @@ If Node.js is missing or below v18, suggest installation:
 
 ## Step 3 of 10: Clone the repository
 
-Clone the repo to a sensible default location. Ask the user where they'd like it, defaulting to the current folder:
+Clone the repo to llm-shopping-cart subdirectory of current working folder.
 
 ```bash
 git clone https://github.com/ampai-uk/llm-shopping-cart.git llm-shopping-cart
