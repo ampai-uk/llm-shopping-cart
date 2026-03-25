@@ -60,7 +60,7 @@ After the user has answered all three questions, give them an overview:
 > 7. Verify local setup
 > 8. Install gcloud CLI + authenticate + set up GCP project
 > 9. Deploy to Cloud Run
-> 10. Register MCP connector + summary
+> 10. Summary + connection setup instructions
 >
 > A few things to be aware of:
 > - Several steps will run scripts that require **your approval** before executing.
@@ -414,51 +414,15 @@ curl -s "$SERVICE_URL/" | head -5
 
 ---
 
-## Step 10 of 10: Register MCP connector and summary
+## Step 10 of 10: Summary
 
-### Register the connector in Claude Code
+### Setting up the connection in Claude
 
-Ask the user:
-> "Would you like me to register the deployed MCP server in your Claude Code settings so it's available as a connector?"
+Tell the user:
+> "Your MCP server is now deployed. To connect it to Claude, follow the instructions here:
+> https://github.com/ampai-uk/llm-shopping-cart#connecting-to-claude"
 
-If they confirm:
-
-**If no auth:**
-```bash
-claude mcp add --transport http ocado-remote <service-url>/mcp
-```
-
-**If OAuth:**
-Read the saved credentials:
-```bash
-cat .oauth-credentials
-```
-
-Then register:
-```bash
-claude mcp add --transport http ocado-remote <service-url>/mcp \
-  --header "Authorization: Bearer <token>"
-```
-
-To get a token:
-```bash
-TOKEN=$(curl -s -X POST <service-url>/token \
-  -d "grant_type=client_credentials&client_id=<client-id>&client_secret=<client-secret>" \
-  | node -e "process.stdin.on('data',d=>console.log(JSON.parse(d).access_token))")
-claude mcp add --transport http ocado-remote <service-url>/mcp \
-  --header "Authorization: Bearer $TOKEN"
-```
-
-Note: OAuth tokens expire. For permanent OAuth access, tell the user they can also configure the connector in Claude.ai Settings > Connectors with the full OAuth flow (client ID, client secret, token URL).
-
-Verify:
-```bash
-claude mcp list
-```
-
-### Summary
-
-Print a summary:
+Then print the details they'll need:
 
 **If OAuth:**
 ```
