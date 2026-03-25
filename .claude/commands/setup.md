@@ -229,6 +229,6 @@ Available tools:
   - update_orders: Refresh order history
 
 Tips:
-  - Re-run /setup any time to refresh your session or orders
-  - Sessions expire after ~7 days — /setup will detect this
+  - Run /refresh to renew your session and redeploy (lightweight, no setup questions)
+  - Sessions expire after ~7 days — /refresh will detect this
 ```

@@ -231,7 +231,6 @@ claude mcp list
 
 **For both modes:**
 ```
-To update data after a new Ocado delivery:
-  1. Run /setup locally to refresh session and orders
-  2. Re-run /deploy to upload fresh data to Cloud Run
+To refresh your session after it expires (~7 days):
+  Run /refresh — it will re-login, fetch orders, and redeploy automatically.
 ```

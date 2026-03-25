@@ -54,6 +54,7 @@ node mcp-server-http.js              # Start HTTP MCP server (for Cloud Run)
 
 - `/setup` — Guided setup wizard (idempotent, safe to re-run)
 - `/deploy` — Deploy to Google Cloud Run
+- `/refresh` — Refresh expired session and redeploy (lightweight, for returning users)
 
 ## Files Not in Git
 
